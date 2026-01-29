@@ -1,0 +1,48 @@
+services:
+  db:
+    image: mariadb:lts
+    command: --max-allowed-packet=64MB
+    restart: always
+    volumes:
+      - db-data:/var/lib/mysql
+    environment:
+      - MARIADB_AUTO_UPGRADE=1
+      - MARIADB_DISABLE_UPGRADE_BACKUP=1
+      - MARIADB_INITDB_SKIP_TZINFO=1
+      - MARIADB_DATABASE=${MARIADB_DATABASE:-matomo}
+      - MARIADB_USER=${MARIADB_USER:-matomo}
+      - MARIADB_PASSWORD=${MARIADB_PASSWORD}
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  matomo:
+    image: matomo:latest
+    restart: always
+    volumes:
+      - matomo-data:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - MATOMO_DATABASE_HOST=db
+      - MATOMO_DATABASE_ADAPTER=mysql
+      - MATOMO_DATABASE_DBNAME=${MARIADB_DATABASE:-matomo}
+      - MATOMO_DATABASE_USERNAME=${MARIADB_USER:-matomo}
+      - MATOMO_DATABASE_PASSWORD=${MARIADB_PASSWORD}
+      - MATOMO_DATABASE_TABLES_PREFIX=${MATOMO_DATABASE_TABLES_PREFIX:-matomo_}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  db-data:
+  matomo-data:
